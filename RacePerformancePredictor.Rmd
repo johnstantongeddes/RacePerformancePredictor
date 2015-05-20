@@ -1,0 +1,280 @@
+---
+title: "Race Performance Prediction"
+author: "John Stanton-Geddes"
+date: "May 19, 2015"
+output:
+  html_document:
+    keep_md: yes
+    theme: journal
+---
+
+Avoiding the [Wall](https://www.youtube.com/watch?v=6pttqFUviWs) in a marathon requires careful pacing over the first half of the race. As most runners only race 1-2 marathons a year, it can be difficult to predict the correct target pace. The most widely-used [methods for predicting performance](http://run-down.com/statistics/calcs_explained.php) are all pretty [old](http://www.cs.uml.edu/~phoffman/xcinfo3.html). As a statistician, they also frustrate me for their lack of accounting for uncertainty. In this report, I use empirical observations of personal bests available from www.athlinks.com to derive a new and improved marathon performance predictor.
+
+The ultimate goal is to answer the question *what should my goal for a marathon be based on a recent half-marathon performance?*  
+
+```{r setup, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+library(stringr)
+library(ggplot2)
+library(lubridate)
+library(mgcv)
+library(tidyr)
+library(plyr)
+library(dplyr)
+
+source("toSeconds.R")
+source("toHMS.R")
+```
+
+
+```{r data, echo=FALSE, eval=TRUE, results='hide'}
+# load data. if not available, scrape from web
+# THIS CAN TAKE MANY HOURS
+if(file.exists("pb_data.Rda")) {
+  load("pb_data.Rda")
+  #pb_data <- read.csv("pb_data.csv")
+  } else {
+    print("Need race results data. Load pb_data.Rda or run script `source(getPBdata.R)")
+  }
+```
+
+# Data
+
+I collected personal best times from a haphazard sample of athletes on (http://www.athlinks.com/) that had a marathon best time listed. To select the best data possible, I pulled results for the top 100 athletes from 15 regions, sorted by  `Race Count`, under the assumption that athletes with the most races would be more likley to have complete data (see details in `getPBdata.R` script). Further data cleaning yielded data a total of 1,333 athletes.
+
+For these athletes, the plot of distance against race time shows a wider range at longer distances, as would be expected.
+
+```{r eda, echo=FALSE, message=FALSE, warning=FALSE}
+# remove gender not M/F
+pb_data <- pb_data %>%
+  filter(gender %in% c("M", "F"))
+
+# subset races
+pb_data_sub <- pb_data %>%
+  filter(distance %in% c("1/2 Mara", "Marathon", "5K", "10K", "15K Run", "20K Run", "5Mi Run", "10Mi Run"))
+
+# add distance in km for races
+pb_data_sub <- pb_data_sub %>%
+  mutate(distancekm = ifelse(distance == "Marathon", 42.2,
+                             ifelse(distance == "1/2 Mara", 21.1, 
+                                    ifelse(distance == "20K Run", 20,
+                                           ifelse(distance == "10Mi Run", 16.12,
+                                                  ifelse(distance == "15K Run", 15,
+                                                         ifelse(distance == "10K", 10,
+                                                                ifelse(distance == "5Mi Run", 8.05,
+                                                                       ifelse(distance == "5K", 5, NA)))))))))
+
+# plot
+g1 <- ggplot(pb_data_sub, aes(x = distancekm, y = totalseconds, group = id, color = gender)) + 
+  geom_line() + 
+  xlab("Distance (KM)") + 
+  ylab("Total time (sec)") + 
+  scale_colour_discrete(name = "Gender")
+
+g1
+```
+
+Grouping by gender and plotting on a log-scale, we see that men (blue) tend to be faster than women (red lines) at all distances.
+
+```{r eda2, echo=FALSE, message = FALSE, warning=FALSE}
+g2 <- ggplot(pb_data_sub, aes(x = distancekm, y = log(totalseconds), group = gender, color = gender)) + 
+  geom_smooth(method = "loess") + 
+  xlab("Distance (KM)") + 
+  ylab("log(Total time) (sec)") + 
+  scale_colour_discrete(name = "Gender")
+
+suppressWarnings(g2)
+```
+
+However, grouping by gender ignores significant variation among athletes in performance. I calculated each athletes 'rank' in comparison to all other athletes in the dataset, and took their average rank across distances. As the dataset includes national caliber (e.g. 61 minute half-marathon) to much slower (e.g. 3 hour half-marathon) runners, this is representative of the entire US running population. 
+
+In this figure, it appears that highly-ranked runners (Rank top 1-5%, darker lines) slow down less than recreational runners (Rank > 75%, lighter lines). 
+
+```{r rank, echo=FALSE, warning=FALSE, message=FALSE}
+# add indicator for caliber of athlete based on race times
+pb_data_sub <- pb_data_sub %>%
+  group_by(distance) %>%
+  mutate(distancerank = round(percent_rank(totalseconds), 2)) 
+
+# mean rank across distances
+pb_data_sub <- ungroup(pb_data_sub)
+
+pb_data_sub <- pb_data_sub %>%
+  group_by(id) %>%
+  mutate(athRank = mean(distancerank),
+         athRankR = round_any(athRank, accuracy = 0.05, f = round) * 100
+         )
+
+# plot by caliber and gender
+g3 <- ggplot(pb_data_sub, aes(x = distancekm, y = totalseconds, group = athRankR, color = athRankR)) +
+  facet_grid(. ~ gender) +
+  geom_smooth(method = "loess") +
+  xlab("Distance (KM)") + 
+  ylab("Total time (sec)") +
+  scale_colour_continuous(name = "Rank")
+
+suppressMessages(g3)
+```
+
+# Method 1: predict change in pace with increasing distance
+
+First, I tried to emulate methods that predict how much a runner's pace decreases in races of increasing distance. As the function of race time against distance appears to be nearly linear, I fit a linear model with a second-order polynomial to allow for slowing over longer distances, variables for gender and athlete rank, and allowed for interactions among all these.  
+
+This figure shows the predicted values from the model (black lines) at Ranks of 10%, 50% and 90% for a male runner, against the raw data plotted in gray. This looks like a pretty good model!
+
+```{r prediction, echo=FALSE, warning=FALSE}
+# fit linear model
+lm1 <- lm(totalseconds ~ distancekm * I(distancekm^2) * gender * athRank, data = pb_data_sub)
+#summary(lm1)
+
+# predict 
+preddata <- data.frame(
+  distancekm = rep(c(5, 10, 21.1, 20, 40, 42.2), times=3),
+  gender = rep(c("M"), times=18),
+  athRank = rep(c(0.1, 0.5, 0.9), each=6, times=2),
+  athRankR = rep(c(0.1, 0.5, 0.9), each=6, times=2))
+
+plm1 <- predict(lm1, newdata=preddata, se.fit = TRUE)
+plm1df <- cbind(preddata, pTime = plm1$fit, seTime = plm1$se.fit)
+
+
+g4 <- ggplot() +
+  geom_smooth(data=pb_data_sub, aes(x = distancekm, y = totalseconds, group = athRankR, color = athRankR)) +
+  geom_line(data=plm1df, aes(x=distancekm, y= pTime, group=athRankR)) +
+  scale_color_gradient(name = "Rank", low="lightgrey", high="darkgrey") +
+  xlab("Distance (KM)") + 
+  ylab("Total time (sec)")
+g4
+```
+
+```{r gam, echo=FALSE, results='hide', eval=FALSE}
+## NOT SHOWN
+
+# allow speed to vary non-parametrically using generalized additive model (GAM)
+
+gam1 <- gam(totalseconds ~ s(distancekm, k=5) + gender * athRank, data = pb_data_sub)
+summary(gam1)
+plot(gam1, residuals=T, pch=16)
+
+# predict for gam
+pgam1 <- predict(gam1, newdata=preddata, se.fit = TRUE)
+pgam1df <- cbind(preddata, pTime = as.numeric(pgam1$fit),
+                 seTime = as.numeric(pgam1$se.fit))
+
+g5 <- ggplot() +
+  geom_line(data=plm1df, aes(x=distancekm, y= pTime, group=athRankR, color = "red")) +
+  geom_line(data=pgam1df, aes(x=distancekm, y=pTime, group=athRankR, color = "blue")) +
+  xlab("Distance (KM)") + 
+  ylab("Total time (sec)") +
+  theme(legend.position = "none") +
+  scale_fill_discrete()
+g5
+```
+
+Intermediate to answering my ultimate question, I explored how much athletes of different ranks slowed down in races of increasing distances. From my observation above, I hypothesized that faster runners would slow less than slower runners. 
+
+```{r slowdown, echo=FALSE, eval=TRUE}
+# function to calculate percentage decrease in pace between a shorter (dist1) and longer distance (dist2)
+paceSlowDown <- function(model, gen, athRankR, dist1, dist2) {
+  df <- data.frame(
+    distancekm = c(dist1, dist2),
+    gender = rep(gen, 2),
+    athRank = rep(athRankR/100, 2))
+  
+  df$pTime <- as.numeric(predict(model, newdata=df))
+  df$pace <- df$pTime / df$distancekm
+  
+  S <- (df$pace[2] - df$pace[1]) / df$pace[1] * 100
+  
+    
+(df$pace[2] / df$pace[1])
+  
+  return(round(S,1))
+}
+
+# compare rate of slow down as race length doubles for average athlete
+psd1 <- paceSlowDown(lm1, gen="M", athRankR=50, dist1 = 5, dist2 = 10)
+psd2 <- paceSlowDown(lm1, gen="M", athRankR=50, dist1 = 10, dist2 = 20)
+psd3 <- paceSlowDown(lm1, gen="M", athRankR=50, dist1 = 21.1, dist2 = 42.2)
+
+# compare rate of slow down between half and full marathon for different rank athletes
+msd10 <- paceSlowDown(lm1, gen="M", athRankR=10, dist1 = 21.1, dist2 = 42.2)
+msd50 <- paceSlowDown(lm1, gen="M", athRankR=50, dist1 = 21.1, dist2 = 42.2)
+msd90 <- paceSlowDown(lm1, gen="M", athRankR=90, dist1 = 21.1, dist2 = 42.2)
+
+msdf <- data.frame(
+  athRank = c(10, 50, 90),
+  slowdown = c(msd10, msd50, msd90))
+
+ggplot(msdf, aes(athRank, slowdown)) + 
+  geom_point() +
+  geom_line() + 
+  ylim(0, 15) +
+  xlab("Athlete Rank") +
+  ylab("Percent slow down from half to full marathon")
+```
+
+The above figure supports this hypothesis! Runners ranked in the top 10% only slow down by ~6% from the half to full marathon, whereas runners at the 90% rank slow by ~12%. 
+
+# And my prediction is...
+
+```{r jsg, echo=FALSE, results="hide"}
+filter(pb_data_sub, distance == "1/2 Mara", totalseconds < 4350, totalseconds > 4340)
+# rank 5
+msd05 <- paceSlowDown(lm1, gen="M", athRankR=5, dist1 = 21.1, dist2 = 42.2)
+```
+
+Taking this to a personal level, using my most recent half-marathon (1:12:22, 5th percentile) and the 5^th^ and 50^th^ percentiles as brackets, my predicted performance at a marathon is between `r toHMS(4343 * 2 + (4343 * 2 * msd05/100))` and `r toHMS(4343 * 2 + (4343 * 2 * msd50/100))`.
+
+While the fast end of my predictions is on par with the current [performance calculators](http://www.runningforfitness.org/calc/racepaces/rp/rpother?dist=13.1&units=miles&hr=1&min=12&sec=23&age=33&gender=M&Submit=Calculate), the slow end is quite a bit slower, indicating that these tools may be setting unrealistic expectations for most runners!
+
+The problem with this approach is that my estimate range came from my own expectations of my performance. 
+
+# Method 2: predict time directly
+
+In the previous section, I used data on times across distances to predict how much a runner's pace slows down as the distance increases. An alternate approach is to directly predict a marathon time from a half-marathon or other race time. I explored this approach here.
+
+```{r pred2, echo=FALSE}
+pb_data_sub2 <- filter(pb_data_sub, distance %in% c("1/2 Mara", "Marathon"))
+
+# reshape data
+#pb_spread <- spread(pb_data_sub2, distance, distancetime) #DOESN'T WORK?
+# filter to half-marathon
+pb_hm <- filter(pb_data_sub, distance == "1/2 Mara") %>%
+  mutate(hmaratime = totalseconds) %>%
+  select(id, hmaratime)
+# filter to marathon
+pb_m <- filter(pb_data_sub, distance == "Marathon") %>%
+  mutate(maratime = totalseconds) %>%
+  select(id, gender, athRank, athRankR, maratime)
+# merge
+pb_wide <- merge(pb_m, pb_hm)
+pb_wide$gender <- as.factor(pb_wide$gender)
+#str(pb_wide)
+
+# fit model
+lm2 <- lm(maratime ~ hmaratime * gender + athRank, data = pb_wide)
+anova(lm2)
+#summary(lm2)
+#plot(lm2)
+
+# predict
+myprediction <- predict(lm2, newdata = data.frame(hmaratime = 4343, gender = "M", athRank = 0.05), se.fit = TRUE)
+
+# prediction
+toHMS(myprediction$fit)
+# lower estimate
+#toHMS(myprediction$fit - myprediction$se.fit)
+# upper estimate
+#toHMS(myprediction$fit + myprediction$se.fit)
+```
+
+Using this model, my marathon prediction is `r toHMS(myprediction$fit - myprediction$se.fit)` to `r toHMS(myprediction$fit + myprediction$se.fit)`, which falls on the slow end of the range from the pace slow-down approach above. This also supports the conclusion that current marathon performance predictors produce overly optimistic predictions for runners.
+
+
+# Notes and Such
+
+This analysis done in [R](http://www.r-project.org/) using [RStudio](http://www.rstudio.com/) and these helpful packages. Special thanks to [rvest](http://blog.rstudio.org/2014/11/24/rvest-easy-web-scraping-with-r/) for making the web-scraping possible.
+
+```{r sessioninfo, echo=FALSE}
+sessionInfo()
+```
