@@ -252,7 +252,7 @@ pb_wide$gender <- as.factor(pb_wide$gender)
 #str(pb_wide)
 
 # fit model
-lm2 <- lm(maratime ~ hmaratime + athRank + gender, data = pb_wide)
+lm2 <- lm(maratime ~ hmaratime + athRank * gender, data = pb_wide)
 anova(lm2)
 #summary(lm2)
 #plot(lm2)

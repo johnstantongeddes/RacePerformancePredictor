@@ -64,16 +64,17 @@ In the previous section, I used data on times across distances to predict how mu
 ## Analysis of Variance Table
 ## 
 ## Response: maratime
-##             Df     Sum Sq    Mean Sq   F value    Pr(>F)    
-## hmaratime    1 6058798953 6058798953 3811.7719 < 2.2e-16 ***
-## athRank      1  539129272  539129272  339.1824 < 2.2e-16 ***
-## gender       1   13686466   13686466    8.6106  0.003401 ** 
-## Residuals 1302 2069524753    1589497                        
+##                  Df     Sum Sq    Mean Sq   F value    Pr(>F)    
+## hmaratime         1 6058798953 6058798953 3838.2250 < 2.2e-16 ***
+## athRank           1  539129272  539129272  341.5362 < 2.2e-16 ***
+## gender            1   13686466   13686466    8.6703  0.003292 ** 
+## athRank:gender    1   15841761   15841761   10.0357  0.001571 ** 
+## Residuals      1301 2053682991    1578542                        
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```
 
-The model output shows that half-marathon time and athlete rank are important predictors of marathon time, but gender doesn't matter when these factors are accounted for. Using this model, my marathon prediction is between **02:33:04 and 02:35:21**, which falls in the middle of the range from the pace slow-down approach above. This also supports the conclusion that current marathon performance predictors produce overly optimistic predictions for most runners.
+The model output shows that half-marathon time and athlete rank are important predictors of marathon time, but gender doesn't matter when these factors are accounted for. Using this model, my marathon prediction is between **02:34:41 and 02:37:13**, which falls in the middle of the range from the pace slow-down approach above. This also supports the conclusion that current marathon performance predictors produce overly optimistic predictions for most runners.
 
 
 # Notes and Such
@@ -82,8 +83,8 @@ This analysis done in [R](http://www.r-project.org/) using [RStudio](http://www.
 
 
 ```
-## R version 3.1.2 (2014-10-31)
-## Platform: x86_64-apple-darwin13.4.0 (64-bit)
+## R version 3.1.1 (2014-07-10)
+## Platform: x86_64-apple-darwin13.1.0 (64-bit)
 ## 
 ## locale:
 ## [1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
@@ -93,15 +94,15 @@ This analysis done in [R](http://www.r-project.org/) using [RStudio](http://www.
 ## 
 ## other attached packages:
 ## [1] dplyr_0.4.1.9000 plyr_1.8.1       tidyr_0.2.0      lubridate_1.3.3 
-## [5] ggplot2_1.0.0    stringr_0.6.2   
+## [5] ggplot2_1.0.1    stringr_0.6.2   
 ## 
 ## loaded via a namespace (and not attached):
-##  [1] assertthat_0.1       colorspace_1.2-4     DBI_0.3.1           
-##  [4] digest_0.6.8         evaluate_0.5.5       formatR_1.0         
-##  [7] grid_3.1.2           gtable_0.1.2         htmltools_0.2.6     
-## [10] knitr_1.8            labeling_0.3         lazyeval_0.1.10.9000
-## [13] magrittr_1.5         MASS_7.3-35          memoise_0.2.1       
-## [16] munsell_0.4.2        parallel_3.1.2       proto_0.3-10        
-## [19] Rcpp_0.11.3          reshape2_1.4.1       rmarkdown_0.5.0.1   
-## [22] scales_0.2.4         tools_3.1.2          yaml_2.1.13
+##  [1] assertthat_0.1       colorspace_1.2-6     DBI_0.3.1           
+##  [4] digest_0.6.8         evaluate_0.6         formatR_1.1         
+##  [7] grid_3.1.1           gtable_0.1.2         htmltools_0.2.6     
+## [10] knitr_1.9            labeling_0.3         lazyeval_0.1.10.9000
+## [13] magrittr_1.5         MASS_7.3-40          memoise_0.2.1       
+## [16] munsell_0.4.2        parallel_3.1.1       proto_0.3-10        
+## [19] Rcpp_0.11.5          reshape2_1.4.1       rmarkdown_0.5.1     
+## [22] scales_0.2.4         tools_3.1.1          yaml_2.1.13
 ```
