@@ -64,18 +64,40 @@ In the previous section, I used data on times across distances to predict how mu
 ## Analysis of Variance Table
 ## 
 ## Response: maratime
-##                  Df     Sum Sq    Mean Sq   F value    Pr(>F)    
-## hmaratime         1 6058798953 6058798953 3838.2250 < 2.2e-16 ***
-## athRank           1  539129272  539129272  341.5362 < 2.2e-16 ***
-## gender            1   13686466   13686466    8.6703  0.003292 ** 
-## athRank:gender    1   15841761   15841761   10.0357  0.001571 ** 
-## Residuals      1301 2053682991    1578542                        
+##                             Df     Sum Sq    Mean Sq   F value    Pr(>F)
+## poly(hmaratime, 2)           2 6176318657 3088159329 1635.2689 < 2.2e-16
+## gender                       1       1618       1618    0.0009    0.9767
+## poly(hmaratime, 2):gender    2   49805763   24902881   13.1868  2.14e-06
+## Residuals                 1300 2455013405    1888472                    
+##                              
+## poly(hmaratime, 2)        ***
+## gender                       
+## poly(hmaratime, 2):gender ***
+## Residuals                    
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```
 
-The model output shows that half-marathon time and athlete rank are important predictors of marathon time, but gender doesn't matter when these factors are accounted for. Using this model, my marathon prediction is between **02:34:41 and 02:37:13**, which falls in the middle of the range from the pace slow-down approach above. This also supports the conclusion that current marathon performance predictors produce overly optimistic predictions for most runners.
+The model output shows that half-marathon time and athlete rank are important predictors of marathon time, but gender doesn't matter when these factors are accounted for. Using this model, my marathon prediction is between **02:32:44 and 02:36:2.5**, which falls in the middle of the range from the pace slow-down approach above. This also supports the conclusion that current marathon performance predictors produce overly optimistic predictions for most runners.
 
+Some friends pointed out that I'm not exactly an independent measure. So, I'm going to predict for fellow Green Mountain Athletic Association runners based on results at the [New Bedford Half Marathon](http://static.djlmgdigital.com.s3.amazonaws.com/nbt/southcoasttoday/graphics/pdf/2015HalfMarathonResults.pdf) and the [Marathon Unplugged]()
+
+*New Bedford*
+
+- Teague O'Connor - 1:08:47
+- Binney Mitchell - 1:17:31
+- Pascal Cheng    - 1:41:16
+
+*Unplugged*
+
+- Tom Thurston    - 1:18:04
+
+[will add some more later when I see the VCM list]
+
+
+```
+## [1] "02:23:20"   "02:49:27"   "03:48:31"   "02:51:0.87"
+```
 
 # Notes and Such
 

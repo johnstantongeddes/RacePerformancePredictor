@@ -252,13 +252,10 @@ pb_wide$gender <- as.factor(pb_wide$gender)
 #str(pb_wide)
 
 # fit model
-lm2 <- lm(maratime ~ hmaratime + athRank * gender, data = pb_wide)
+lm2 <- lm(maratime ~ poly(hmaratime, 2) * gender, data = pb_wide)
 anova(lm2)
 #summary(lm2)
 #plot(lm2)
-
-# NOTE - oddly, the model including the interaction between time and rank fits better, but the prediction (2:45:57) is crazy slow based on ground-truthing so I didn't use this model
-
 
 # predict
 myprediction <- predict(lm2, newdata = data.frame(hmaratime = 4343, gender = "M", athRank = 0.05), se.fit = TRUE)
@@ -273,6 +270,32 @@ myprediction <- predict(lm2, newdata = data.frame(hmaratime = 4343, gender = "M"
 
 The model output shows that half-marathon time and athlete rank are important predictors of marathon time, but gender doesn't matter when these factors are accounted for. Using this model, my marathon prediction is between **`r toHMS(myprediction$fit - myprediction$se.fit)` and `r toHMS(myprediction$fit + myprediction$se.fit)`**, which falls in the middle of the range from the pace slow-down approach above. This also supports the conclusion that current marathon performance predictors produce overly optimistic predictions for most runners.
 
+Some friends pointed out that I'm not exactly an independent measure. So, I'm going to predict for fellow Green Mountain Athletic Association runners based on results at the [New Bedford Half Marathon](http://static.djlmgdigital.com.s3.amazonaws.com/nbt/southcoasttoday/graphics/pdf/2015HalfMarathonResults.pdf) and the [Marathon Unplugged]()
+
+*New Bedford*
+
+- Teague O'Connor - 1:08:47
+- Binney Mitchell - 1:17:31
+- Pascal Cheng    - 1:41:16
+
+*Unplugged*
+
+- Tom Thurston    - 1:18:04
+
+[will add some more later when I see the VCM list]
+
+```{r other_predictions, echo=FALSE}
+# predict
+runners_to_predict <- data.frame(
+  runner = c("TO", "BM", "PC", "TT"),
+  hmaratime = c(4127, 4651, 6076, 4684), 
+  gender = c("M", "M", "M", "M"), 
+  athRank = c(0.036, 0.11, 0.20, 0.13))
+
+runners_predict <- predict(lm2, newdata = runners_to_predict, se.fit = TRUE)
+
+toHMS(runners_predict$fit)
+```
 
 # Notes and Such
 
