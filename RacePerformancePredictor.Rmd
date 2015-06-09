@@ -261,16 +261,42 @@ anova(lm2)
 myprediction <- predict(lm2, newdata = data.frame(hmaratime = 4343, gender = "M", athRank = 0.05), se.fit = TRUE)
 
 # prediction
-#toHMS(myprediction$fit)
+toHMS(myprediction$fit)
 # lower estimate
-#toHMS(myprediction$fit - myprediction$se.fit)
+toHMS(myprediction$fit - myprediction$se.fit)
 # upper estimate
-#toHMS(myprediction$fit + myprediction$se.fit)
+toHMS(myprediction$fit + myprediction$se.fit)
 ```
 
 The model output shows that half-marathon time and athlete rank are important predictors of marathon time, but gender doesn't matter when these factors are accounted for. Using this model, my marathon prediction is between **`r toHMS(myprediction$fit - myprediction$se.fit)` and `r toHMS(myprediction$fit + myprediction$se.fit)`**, which falls in the middle of the range from the pace slow-down approach above. This also supports the conclusion that current marathon performance predictors produce overly optimistic predictions for most runners.
 
 Some friends pointed out that I'm not exactly an independent measure. So, I'm going to predict for fellow Green Mountain Athletic Association runners based on results at the [New Bedford Half Marathon](http://static.djlmgdigital.com.s3.amazonaws.com/nbt/southcoasttoday/graphics/pdf/2015HalfMarathonResults.pdf) and the [Marathon Unplugged]()
+
+```{r other_runners, echo=FALSE, results='hide'}
+test <- read.csv("data/test_set.csv", stringsAsFactors = FALSE)
+test <- test %>%
+  mutate(time = toSeconds(m_time))
+str(test)
+
+test_set <- filter(test, distance == 21.1)
+test_set <- rename(test_set, hmaratime = time)
+
+test_set <- droplevels(test_set)
+str(test_set)
+
+# predict
+test_predict <- predict(lm2, newdata = test_set, se.fit = TRUE)
+
+train_set <- filter(test, distance == 42.2)
+train_set$prediction <- unlist(lapply(test_predict$fit, toHMS))
+
+# calculate Deviation
+train_set <- mutate(train_set, ae = toSeconds(m_time) - toSeconds(prediction))
+
+# histogram of deviations of predicted from observed
+hist(train_set$ae)
+# not bad. nearly normal around 0 with one large positive outlier
+```
 
 *New Bedford*
 
