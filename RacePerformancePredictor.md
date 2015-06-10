@@ -57,7 +57,7 @@ The problem with this approach is that my estimate range came from my own expect
 
 # Method 2: predict time directly
 
-In the previous section, I used data on times across distances to predict how much a runner's pace slows down as the distance increases. An alternate approach is to directly predict a marathon time from a half-marathon or other race time. I explored this approach here.
+In the previous section, I used data on times across distances to predict how much a runner's pace slows down as the distance increases. An alternate approach is to directly predict a marathon time from a half-marathon or other race time. After exploring a few different statistical models, here's the output from my best model, including half-marathon time, gender and the interaction between these predictors.
 
 
 ```
@@ -78,13 +78,27 @@ In the previous section, I used data on times across distances to predict how mu
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```
 
-The model output shows that half-marathon time and athlete rank are important predictors of marathon time, but gender doesn't matter when these factors are accounted for. Using this model, my marathon prediction is between **02:32:44 and 02:36:2.5**, which falls in the middle of the range from the pace slow-down approach above. This also supports the conclusion that current marathon performance predictors produce overly optimistic predictions for most runners.
+The model output shows that half-marathon time and athlete rank are important predictors of marathon time, but gender doesn't matter when these factors are accounted for. Using this model, my marathon prediction is between **02:32:44 and 02:36:03**, which falls in the middle of the range from the pace slow-down approach above. This also supports the conclusion that current marathon performance predictors produce overly optimistic predictions for most runners.
 
-Some friends pointed out that I'm not exactly an independent measure. So, I'm going to predict for fellow Green Mountain Athletic Association runners based on results at the [New Bedford Half Marathon](http://static.djlmgdigital.com.s3.amazonaws.com/nbt/southcoasttoday/graphics/pdf/2015HalfMarathonResults.pdf) and the [Marathon Unplugged]()
+# Model Performance
+
+Some friends pointed out that I'm not exactly an independent measure. So, I grabbed recent half-marathon times from the [New Bedford Half Marathon](http://static.djlmgdigital.com.s3.amazonaws.com/nbt/southcoasttoday/graphics/pdf/2015HalfMarathonResults.pdf) and the [Marathon Unplugged]() for 22 USATF New England runners that competed in the [marathon]() (and were unaware of this analysis). I then used the model to predict their marathon times and compare to the actual results.
+
+This figure shows the deviation from each runner's observed marathon time and their predicted time from my model. Negative values mean they ran faster then the prediction, while positive means they ran slower.
+
+
+![](RacePerformancePredictor_files/figure-html/other_runners-1.png) 
+
+This *simple* model had a median error of only 29.5 seconds for these 22 runners! This result far excited my expectations. 
+
+That said, the prediction was quite variable. Exactly half (11) of my test observations were faster, and thus half were slower. The prediction error for the slower result had a longer skew though, which is to be expected; when you blow up at a marathon, you *really* slow down. 
+
+For fun, here are a few specific examples:
 
 *New Bedford*
 
-- Teague O'Connor - 1:08:47
+- Matt Pelletier (VCM winner) - 1:07:09
+- Teage O'Connor - 1:08:47
 - Binney Mitchell - 1:17:31
 - Pascal Cheng    - 1:41:16
 
@@ -92,12 +106,17 @@ Some friends pointed out that I'm not exactly an independent measure. So, I'm go
 
 - Tom Thurston    - 1:18:04
 
-[will add some more later when I see the VCM list]
 
+|     Runner      |  Predicted  |  Actual  |  Error  |
+|:---------------:|:-----------:|:--------:|:-------:|
+| Matt Pelletier  |  02:18:11   | 2:19:12  |  60.92  |
+| Teage O'Connor  |  02:23:20   | 2:33:32  |  612.1  |
+| Binney Mitchell |  02:49:27   | 2:57:12  |  465.1  |
+|  Pascal Cheng   |  03:48:31   | 3:27:07  |  -1284  |
+|  Tom Thurston   | 02:51:0.87  | 2:41:53  | -547.9  |
 
-```
-## [1] "02:23:20"   "02:49:27"   "03:48:31"   "02:51:0.87"
-```
+Also not bad! Prediction was only 60 seconds slow for the winner. 10 minutes too fast for Teage, but 2:23 was his goal time. Tom Thurston and Pascal Cheng are both talented masters runners with plenty of marathon experience, which showed as they ran 10 and 20 10 minutes *faster* than their predicted times!
+
 
 # Notes and Such
 
@@ -115,8 +134,8 @@ This analysis done in [R](http://www.r-project.org/) using [RStudio](http://www.
 ## [1] stats     graphics  grDevices utils     datasets  methods   base     
 ## 
 ## other attached packages:
-## [1] dplyr_0.4.1.9000 plyr_1.8.1       tidyr_0.2.0      lubridate_1.3.3 
-## [5] ggplot2_1.0.1    stringr_0.6.2   
+## [1] dplyr_0.4.1.9000 plyr_1.8.1       tidyr_0.2.0      pander_0.5.1    
+## [5] lubridate_1.3.3  ggplot2_1.0.1    stringr_0.6.2   
 ## 
 ## loaded via a namespace (and not attached):
 ##  [1] assertthat_0.1       colorspace_1.2-6     DBI_0.3.1           

@@ -1,7 +1,7 @@
 ---
 title: "Race Performance Prediction"
 author: "John Stanton-Geddes"
-date: "May 19, 2015"
+date: "June 9, 2015"
 output:
   html_document:
     keep_md: yes
@@ -16,6 +16,7 @@ The ultimate goal is to answer the question *what should my goal for a marathon 
 library(stringr)
 library(ggplot2)
 library(lubridate)
+library(pander)
 #library(mgcv)
 library(tidyr)
 library(plyr)
@@ -231,7 +232,7 @@ The problem with this approach is that my estimate range came from my own expect
 
 # Method 2: predict time directly
 
-In the previous section, I used data on times across distances to predict how much a runner's pace slows down as the distance increases. An alternate approach is to directly predict a marathon time from a half-marathon or other race time. I explored this approach here.
+In the previous section, I used data on times across distances to predict how much a runner's pace slows down as the distance increases. An alternate approach is to directly predict a marathon time from a half-marathon or other race time. After exploring a few different statistical models, here's the output from my best model, including half-marathon time, gender and the interaction between these predictors.
 
 ```{r pred2, echo=FALSE}
 pb_data_sub2 <- filter(pb_data_sub, distance %in% c("1/2 Mara", "Marathon"))
@@ -261,16 +262,21 @@ anova(lm2)
 myprediction <- predict(lm2, newdata = data.frame(hmaratime = 4343, gender = "M", athRank = 0.05), se.fit = TRUE)
 
 # prediction
-toHMS(myprediction$fit)
+#toHMS(myprediction$fit)
 # lower estimate
-toHMS(myprediction$fit - myprediction$se.fit)
+#toHMS(myprediction$fit - myprediction$se.fit)
 # upper estimate
-toHMS(myprediction$fit + myprediction$se.fit)
+#toHMS(myprediction$fit + myprediction$se.fit)
 ```
 
 The model output shows that half-marathon time and athlete rank are important predictors of marathon time, but gender doesn't matter when these factors are accounted for. Using this model, my marathon prediction is between **`r toHMS(myprediction$fit - myprediction$se.fit)` and `r toHMS(myprediction$fit + myprediction$se.fit)`**, which falls in the middle of the range from the pace slow-down approach above. This also supports the conclusion that current marathon performance predictors produce overly optimistic predictions for most runners.
 
-Some friends pointed out that I'm not exactly an independent measure. So, I'm going to predict for fellow Green Mountain Athletic Association runners based on results at the [New Bedford Half Marathon](http://static.djlmgdigital.com.s3.amazonaws.com/nbt/southcoasttoday/graphics/pdf/2015HalfMarathonResults.pdf) and the [Marathon Unplugged]()
+# Model Performance
+
+Some friends pointed out that I'm not exactly an independent measure. So, I grabbed recent half-marathon times from the [New Bedford Half Marathon](http://static.djlmgdigital.com.s3.amazonaws.com/nbt/southcoasttoday/graphics/pdf/2015HalfMarathonResults.pdf) and the [Marathon Unplugged]() for 22 USATF New England runners that competed in the [marathon]() (and were unaware of this analysis). I then used the model to predict their marathon times and compare to the actual results.
+
+This figure shows the deviation from each runner's observed marathon time and their predicted time from my model. Negative values mean they ran faster then the prediction, while positive means they ran slower.
+
 
 ```{r other_runners, echo=FALSE, results='hide'}
 test <- read.csv("data/test_set.csv", stringsAsFactors = FALSE)
@@ -294,13 +300,22 @@ train_set$prediction <- unlist(lapply(test_predict$fit, toHMS))
 train_set <- mutate(train_set, ae = toSeconds(m_time) - toSeconds(prediction))
 
 # histogram of deviations of predicted from observed
-hist(train_set$ae)
+hist(train_set$ae, ylab = "Frequency", xlab = "Seconds", main = "")
+
+median(train_set$ae)
 # not bad. nearly normal around 0 with one large positive outlier
 ```
 
+This *simple* model had a median error of only `r median(train_set$ae)` seconds for these 22 runners! This result far excited my expectations. 
+
+That said, the prediction was quite variable. Exactly half (`r length(which(sign(train_set$ae) < 0))`) of my test observations were faster, and thus half were slower. The prediction error for the slower result had a longer skew though, which is to be expected; when you blow up at a marathon, you *really* slow down. 
+
+For fun, here are a few specific examples:
+
 *New Bedford*
 
-- Teague O'Connor - 1:08:47
+- Matt Pelletier (VCM winner) - 1:07:09
+- Teage O'Connor - 1:08:47
 - Binney Mitchell - 1:17:31
 - Pascal Cheng    - 1:41:16
 
@@ -308,20 +323,33 @@ hist(train_set$ae)
 
 - Tom Thurston    - 1:18:04
 
-[will add some more later when I see the VCM list]
-
-```{r other_predictions, echo=FALSE}
+```{r other_predictions, echo=FALSE, warning=FALSE, results = 'asis'}
 # predict
 runners_to_predict <- data.frame(
-  runner = c("TO", "BM", "PC", "TT"),
-  hmaratime = c(4127, 4651, 6076, 4684), 
-  gender = c("M", "M", "M", "M"), 
-  athRank = c(0.036, 0.11, 0.20, 0.13))
+  runner = c("MP", "TO", "BM", "PC", "TT"),
+  hmaratime = c(4029, 4127, 4651, 6076, 4684), 
+  gender = c("M", "M", "M", "M", "M"), 
+  athRank = c(0.03, 0.036, 0.11, 0.20, 0.13))
 
 runners_predict <- predict(lm2, newdata = runners_to_predict, se.fit = TRUE)
 
-toHMS(runners_predict$fit)
+# actual results
+observed_mtime <- c("2:19:12", "2:33:32", "2:57:12", "3:27:07", "2:41:53")
+
+
+predicted_mtime <- suppressWarnings(toHMS(runners_predict$fit))
+
+# table of predicted time, actual time, and error
+t2 <- data.frame(Runner = c("Matt Pelletier", "Teage O'Connor", "Binney Mitchell", "Pascal Cheng", "Tom Thurston"),
+                "Predicted" = predicted_mtime,
+                 "Actual" = observed_mtime,
+                 "Error" = toSeconds(observed_mtime) - runners_predict$fit)
+                 
+pandoc.table(t2, style = "rmarkdown")
 ```
+
+Also not bad! Prediction was only 60 seconds slow for the winner. 10 minutes too fast for Teage, but 2:23 was his goal time. Tom Thurston and Pascal Cheng are both talented masters runners with plenty of marathon experience, which showed as they ran 10 and 20 10 minutes *faster* than their predicted times!
+
 
 # Notes and Such
 
